@@ -17,7 +17,6 @@ TOOL=nvim
 . "$(dirname "$0")/../lib/release.sh"
 
 DOTFILES="$(cd "$(dirname "$0")/.." && pwd)"
-NVIM_DIR="$(dirname "$BIN_DIR")/lib/nvim"
 PACK_DIR="$HOME/.local/share/nvim/site/pack/dotfiles/start"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
 
@@ -43,18 +42,7 @@ install_nvim() {
 
     mkdir "$tmp/x"
     tar -xzf "$tmp/download" -C "$tmp/x"
-    src="$tmp/x/nvim-linux-$asset"
-    [ -x "$src/bin/nvim" ] || die "no bin/nvim in $name"
-
-    $SUDO mkdir -p "$(dirname "$NVIM_DIR")" "$BIN_DIR"
-    $SUDO rm -rf "$NVIM_DIR.new"
-    $SUDO cp -R "$src" "$NVIM_DIR.new"
-    $SUDO rm -rf "$NVIM_DIR"
-    $SUDO mv "$NVIM_DIR.new" "$NVIM_DIR"
-    $SUDO ln -sfn "$NVIM_DIR/bin/nvim" "$BIN_DIR/nvim"
-
-    log "installed nvim $VERSION to $NVIM_DIR, linked from $BIN_DIR/nvim"
-    check_path
+    install_dir "$tmp/x/nvim-linux-$asset" "$VERSION"
 }
 
 # pin <name> <repo url> <commit>

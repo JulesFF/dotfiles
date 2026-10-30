@@ -51,11 +51,12 @@ else
 fi
 
 # installed <version>
-# True when $TOOL in $BIN_DIR or on PATH reports <version>.
+# True when $TOOL in $BIN_DIR or on PATH reports <version> when run
+# with $VERSION_ARGS (default --version).
 installed() {
     for existing in "$BIN_DIR/$TOOL" "$(command -v "$TOOL" || true)"; do
         [ -x "$existing" ] || continue
-        if "$existing" --version 2>/dev/null | grep -qF "$1"; then
+        if "$existing" ${VERSION_ARGS:---version} 2>/dev/null | grep -qF "$1"; then
             log "$TOOL $1 already installed at $existing"
             return 0
         fi
@@ -73,6 +74,26 @@ install_bin() {
     $SUDO mv -f "$BIN_DIR/$TOOL.new" "$BIN_DIR/$TOOL"
 
     log "installed $TOOL $2 to $BIN_DIR/$TOOL"
+    check_path
+}
+
+# install_dir <dir> <version>
+# For tools that need files beside their binary: installs <dir>, an
+# unpacked release holding bin/$TOOL, as lib/$TOOL next to $BIN_DIR
+# (~/.local/lib/$TOOL or /usr/local/lib/$TOOL) and links $BIN_DIR/$TOOL
+# to the binary in it.
+install_dir() {
+    [ -x "$1/bin/$TOOL" ] || die "no bin/$TOOL in the release"
+    lib_dir="$(dirname "$BIN_DIR")/lib/$TOOL"
+
+    $SUDO mkdir -p "$(dirname "$lib_dir")" "$BIN_DIR"
+    $SUDO rm -rf "$lib_dir.new"
+    $SUDO cp -R "$1" "$lib_dir.new"
+    $SUDO rm -rf "$lib_dir"
+    $SUDO mv "$lib_dir.new" "$lib_dir"
+    $SUDO ln -sfn "$lib_dir/bin/$TOOL" "$BIN_DIR/$TOOL"
+
+    log "installed $TOOL $2 to $lib_dir, linked from $BIN_DIR/$TOOL"
     check_path
 }
 

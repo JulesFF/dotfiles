@@ -1,13 +1,19 @@
 -- Linked to ~/.config/nvim by install/nvim.sh, which also fetches the
 -- plugins (fzf-lua, nvim-tree) into Neovim's package directory; a
--- missing plugin is skipped along with its keys.
+-- missing plugin or language server is skipped along with its keys.
 --
 -- Keys (leader is Space):
 --   <leader>f   find files            <leader>g   grep the project
 --   <leader>/   search this file      <leader>b   open buffers
 --   <leader>r   resume last search    <leader>e   file tree
 --   <Esc>       clear search highlight
---   <leader>?   show/hide key reminders in the statusline
+--   <leader>?   key reminders in the statusline: files, code, off
+--
+-- In Go, C and C++ files (gopls, clangd):
+--   gd   go to definition             K    docs for the symbol
+--   grr  references                   grn  rename
+--   gra  code actions (fixes)         ]d [d  next/previous problem
+--   C-w d  problem details            C-y  accept completion
 
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
@@ -32,7 +38,7 @@ o.laststatus = 3                      -- one statusline for all windows
 o.winborder = "rounded"               -- floating windows
 o.fillchars = { eob = " " }           -- no ~ past the end of the file
 o.list = true
-o.listchars = { tab = "» ", trail = "·", nbsp = "␣" }
+o.listchars = { tab = "  ", trail = "·", nbsp = "␣" }  -- tabs blank: Go uses them
 
 -- System clipboard, when a provider (wl-copy, xclip, ...) exists.
 if vim.fn.has("clipboard") == 1 then
@@ -42,32 +48,37 @@ end
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<cr>")
 
 -- Statusline: file name on the left, reminders of the keys that work
--- in the current window on the right (␣ is Space).
+-- in the current window on the right (␣ is Space). In a file, ␣? steps
+-- through the pages of reminders, then hides them.
+local pages = {
+    "␣f files  ␣g grep  ␣/ this file  ␣b buffers  ␣e tree  ␣r resume"
+        .. "  C-^ last file  C-w hjkl splits  ␣? code keys",
+    "gd definition  K docs  grr references  grn rename  gra fix"
+        .. "  ]d [d problems  C-w d details  C-y accept  ␣? hide",
+}
 local hints = {
-    default = "␣f files  ␣g grep  ␣/ this file  ␣b buffers  ␣e tree  ␣r resume"
-        .. "  C-^ last file  C-w hjkl splits  ␣? hide",
     NvimTree = "enter open  C-v side  C-x below  a new  r rename  d delete"
         .. "  H dotfiles  g? all keys",
     fzf = "enter open  C-v side  C-s below  C-t tab  esc close",
 }
 local labels = { NvimTree = "files", fzf = "search" }
-vim.g.key_hints = true
+vim.g.key_hints = 1
 
 function _G.statusline()
     local ft = vim.bo[vim.api.nvim_win_get_buf(vim.g.statusline_winid)].filetype
     local left = labels[ft] and " " .. labels[ft] or " %<%f %m%r"
-    if not vim.g.key_hints then
+    if vim.g.key_hints == 0 then
         return left .. "%=%l:%c "
     end
-    local h = hints[ft] or hints.default
+    local h = hints[ft] or pages[vim.g.key_hints]
     return left .. "%=%#Comment#" .. h .. "%* "
 end
 o.statusline = "%!v:lua.statusline()"
 
 vim.keymap.set("n", "<leader>?", function()
-    vim.g.key_hints = not vim.g.key_hints
+    vim.g.key_hints = (vim.g.key_hints + 1) % (#pages + 1)
     vim.cmd.redrawstatus()
-end, { desc = "Show/hide key reminders" })
+end, { desc = "Next page of key reminders" })
 
 -- Briefly highlight yanked text.
 vim.api.nvim_create_autocmd("TextYankPost", {
@@ -118,3 +129,61 @@ if ok_tree then
     })
     vim.keymap.set("n", "<leader>e", "<cmd>NvimTreeFindFileToggle<cr>", { desc = "File tree" })
 end
+
+-- Language servers, through Neovim's built-in client: gopls for Go and
+-- clangd for C and C++ (install/gopls.sh, install/clangd.sh), each
+-- enabled only when installed. clangd needs compile_commands.json for
+-- projects with include paths or flags; with CMake, configure with
+-- -DCMAKE_EXPORT_COMPILE_COMMANDS=ON.
+vim.lsp.config("gopls", {
+    cmd = { "gopls" },
+    filetypes = { "go", "gomod", "gowork", "gotmpl" },
+    root_markers = { "go.work", "go.mod", ".git" },
+})
+vim.lsp.config("clangd", {
+    cmd = { "clangd" },
+    filetypes = { "c", "cpp", "objc", "objcpp", "cuda" },
+    root_markers = { ".clangd", "compile_commands.json", "compile_flags.txt", ".git" },
+})
+for _, name in ipairs({ "gopls", "clangd" }) do
+    if vim.fn.executable(name) == 1 then
+        vim.lsp.enable(name)
+    end
+end
+
+-- Problems at the end of their line, errors first.
+vim.diagnostic.config({ virtual_text = true, severity_sort = true })
+
+-- Completion pops up as you type; C-n/C-p move, C-y accepts, C-e closes.
+o.completeopt = { "menuone", "noselect", "popup", "fuzzy" }
+
+vim.api.nvim_create_autocmd("LspAttach", {
+    callback = function(ev)
+        local client = vim.lsp.get_client_by_id(ev.data.client_id)
+        if client:supports_method("textDocument/completion") then
+            vim.lsp.completion.enable(true, client.id, ev.buf, { autotrigger = true })
+        end
+        vim.keymap.set("n", "gd", vim.lsp.buf.definition, { buffer = ev.buf, desc = "Go to definition" })
+    end,
+})
+
+-- Go files are tidied on save, like goimports: imports added, removed
+-- and sorted, then the file formatted.
+vim.api.nvim_create_autocmd("BufWritePre", {
+    pattern = "*.go",
+    callback = function(ev)
+        local client = vim.lsp.get_clients({ bufnr = ev.buf, name = "gopls" })[1]
+        if not client then
+            return
+        end
+        local params = vim.lsp.util.make_range_params(0, client.offset_encoding)
+        params.context = { only = { "source.organizeImports" }, diagnostics = {} }
+        local res = client:request_sync("textDocument/codeAction", params, 2000, ev.buf)
+        for _, action in ipairs(res and res.result or {}) do
+            if action.edit then
+                vim.lsp.util.apply_workspace_edit(action.edit, client.offset_encoding)
+            end
+        end
+        vim.lsp.buf.format({ bufnr = ev.buf, id = client.id, timeout_ms = 2000 })
+    end,
+})
