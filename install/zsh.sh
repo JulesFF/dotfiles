@@ -45,4 +45,31 @@ else
     log "added to $ZSHRC: $line"
 fi
 
-log "done; open a new shell or run: source $ZSHRC"
+# The plugins and ~/.zshrc are set up either way, but they do nothing
+# until zsh is installed and is the login shell.
+if ! command -v zsh >/dev/null 2>&1; then
+    log "warning: zsh is not installed; install it with:"
+    if [ -e /etc/NIXOS ]; then
+        log "  programs.zsh.enable = true; in configuration.nix, then nixos-rebuild switch"
+    elif command -v dnf >/dev/null 2>&1; then
+        log "  sudo dnf install zsh"
+    elif command -v apt-get >/dev/null 2>&1; then
+        log "  sudo apt install zsh"
+    else
+        log "  your package manager"
+    fi
+    exit 0
+fi
+
+case "${SHELL:-}" in
+    */zsh) ;;
+    *)
+        if [ -e /etc/NIXOS ]; then
+            log "note: login shell is ${SHELL:-unknown}; set users.users.$(id -un).shell = pkgs.zsh;"
+        else
+            log "note: login shell is ${SHELL:-unknown}; to switch: chsh -s $(command -v zsh)"
+        fi
+        ;;
+esac
+
+log "done; start zsh (run: exec zsh), or open a new zsh shell"
