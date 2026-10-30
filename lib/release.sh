@@ -73,7 +73,10 @@ install_bin() {
     $SUDO mv -f "$BIN_DIR/$TOOL.new" "$BIN_DIR/$TOOL"
 
     log "installed $TOOL $2 to $BIN_DIR/$TOOL"
+    check_path
+}
 
+check_path() {
     case ":$PATH:" in
         *":$BIN_DIR:"*) ;;
         *) log "note: $BIN_DIR is not on your PATH" ;;
