@@ -6,6 +6,7 @@
 --   <leader>f   find files            <leader>g   grep the project
 --   <leader>/   search this file      <leader>b   open buffers
 --   <leader>r   resume last search    <leader>e   file tree
+--   <leader>h/j/k/l  move to the window left/down/up/right
 --   <Esc>       clear search highlight
 --   <leader>?   key reminders in the statusline: files, code, off
 --
@@ -46,13 +47,17 @@ if vim.fn.has("clipboard") == 1 then
 end
 
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<cr>")
+vim.keymap.set("n", "<leader>h", "<C-w>h", { desc = "Window left" })
+vim.keymap.set("n", "<leader>j", "<C-w>j", { desc = "Window below" })
+vim.keymap.set("n", "<leader>k", "<C-w>k", { desc = "Window above" })
+vim.keymap.set("n", "<leader>l", "<C-w>l", { desc = "Window right" })
 
 -- Statusline: file name on the left, reminders of the keys that work
 -- in the current window on the right (␣ is Space). In a file, ␣? steps
 -- through the pages of reminders, then hides them.
 local pages = {
     "␣f files  ␣g grep  ␣/ this file  ␣b buffers  ␣e tree  ␣r resume"
-        .. "  C-^ last file  C-w hjkl splits  ␣? code keys",
+        .. "  C-^ last file  ␣hjkl splits  ␣? code keys",
     "gd definition  K docs  grr references  grn rename  gra fix"
         .. "  ]d [d problems  C-w d details  C-y accept  ␣? hide",
 }
@@ -127,7 +132,14 @@ if ok_tree then
         },
         filters = { custom = { "^.git$" } },
     })
-    vim.keymap.set("n", "<leader>e", "<cmd>NvimTreeFindFileToggle<cr>", { desc = "File tree" })
+    vim.keymap.set("n", "<leader>e", function()
+        local api = require("nvim-tree.api")
+        if api.tree.is_tree_buf() then
+            api.tree.close()
+        else
+            api.tree.find_file({ open = true, focus = true })
+        end
+    end, { desc = "File tree" })
 end
 
 -- Language servers, through Neovim's built-in client: gopls for Go and

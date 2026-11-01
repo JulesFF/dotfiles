@@ -33,8 +33,27 @@ _prompt_git() {
 }
 add-zsh-hook precmd _prompt_git
 
+bindkey -e
+bindkey '^[[1;5D' backward-word
+bindkey '^[[1;5C' forward-word
+bindkey '^[[H' beginning-of-line
+bindkey '^[[F' end-of-line
+bindkey '^[[3~' delete-char
+bindkey '^H' backward-kill-word
+bindkey '^[[3;5~' kill-word
+
+() {
+    local -i h=0
+    local c
+    for c in ${(s::)HOST%%.*}; do
+        (( h = (h * 31 + #c) % 1000003 ))
+    done
+    local -a colors=(37 72 108 114 139 172 178 180 209 214)
+    _prompt_host="%F{${colors[h % $#colors + 1]}}%m%f "
+}
+
 setopt prompt_subst
-PROMPT='%F{blue}${_prompt_dir}%f${_prompt_git_info} %(?.%F{magenta}.%F{red})❯%f '
+PROMPT='${_prompt_host}%F{blue}${_prompt_dir}%f${_prompt_git_info} %(?.%F{magenta}.%F{red})❯%f '
 
 # dtree [-n depth] [-f] [-p] [tree options] [dir...]: the directory
 # layout, hidden entries included, without VCS, dependency, virtualenv,
