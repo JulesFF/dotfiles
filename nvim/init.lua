@@ -142,11 +142,13 @@ if ok_tree then
     end, { desc = "File tree" })
 end
 
--- Language servers, through Neovim's built-in client: gopls for Go and
--- clangd for C and C++ (install/gopls.sh, install/clangd.sh), each
--- enabled only when installed. clangd needs compile_commands.json for
--- projects with include paths or flags; with CMake, configure with
--- -DCMAKE_EXPORT_COMPILE_COMMANDS=ON.
+-- Language servers, through Neovim's built-in client: gopls for Go,
+-- clangd for C and C++, tinymist for Typst. Each is enabled only when
+-- on PATH when nvim starts: with Nix, from the project's devShell
+-- (direnv loads it on cd, so start nvim inside the project); without,
+-- from install/gopls.sh and install/clangd.sh. clangd needs
+-- compile_commands.json for projects with include paths or flags; with
+-- CMake, configure with -DCMAKE_EXPORT_COMPILE_COMMANDS=ON.
 vim.lsp.config("gopls", {
     cmd = { "gopls" },
     filetypes = { "go", "gomod", "gowork", "gotmpl" },
@@ -157,8 +159,13 @@ vim.lsp.config("clangd", {
     filetypes = { "c", "cpp", "objc", "objcpp", "cuda" },
     root_markers = { ".clangd", "compile_commands.json", "compile_flags.txt", ".git" },
 })
-for _, name in ipairs({ "gopls", "clangd" }) do
-    if vim.fn.executable(name) == 1 then
+vim.lsp.config("tinymist", {
+    cmd = { "tinymist", "lsp" },
+    filetypes = { "typst" },
+    root_markers = { ".git" },
+})
+for _, name in ipairs({ "gopls", "clangd", "tinymist" }) do
+    if vim.fn.executable(vim.lsp.config[name].cmd[1]) == 1 then
         vim.lsp.enable(name)
     end
 end
