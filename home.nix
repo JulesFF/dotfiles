@@ -81,6 +81,11 @@ in
     programs.git = {
       enable = true;
       settings = {
+        # GitHub's noreply address: commits count on the contribution
+        # graph without publishing a real email.
+        user.name = "jules";
+        user.email = "92317521+JulesFF@users.noreply.github.com";
+
         core.pager = "delta";
         interactive.diffFilter = "delta --color-only";
         delta.navigate = true;
